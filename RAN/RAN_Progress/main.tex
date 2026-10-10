@@ -1,5 +1,8 @@
 \documentclass[12pt, letterpaper]{article}
 
+% --- Preamble ---
+\usepackage[backend=biber, style=numeric]{biblatex} 
+\addbibresource{references.bib} % Make sure this file matches your .bib fil
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%% DO NOT MODIFY HERE %%%%%%%%%%%%%%%%
@@ -47,7 +50,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Overview}
 
-The goal of this project is to extend a 2D mean-field Ring Attractor Network (RAN) into a 3D spherical version for use on a Crazyflie drone for heading tracking. A ring attractor network is a recurrent neural network that forms a stable bump of activity which tracks sensory input. In 2D, nodes are placed on a ring and the network tracks a single angle. In 3D, nodes are placed on the surface of a sphere so that the network can represent a full heading direction in three-dimensional space.
+The goal of this project is to extend a 2D mean-field Ring Attractor Network (RAN) into a 3D spherical version for use on a Crazyflie drone for heading tracking. A ring attractor network is a recurrent neural network that forms a stable bump of activity which tracks sensory input. In 2D, nodes are placed on a ring and the network tracks a single angle. In 3D, nodes are placed on the surface of a sphere so that the network can represent a full heading direction in three-dimensional space \cite{salahshour2025allocentric}.
 
 The network is governed by the following mean-field dynamics:
 
@@ -55,7 +58,7 @@ The network is governed by the following mean-field dynamics:
     \dot{z}_i = -z_i + \tanh\left(u \sum_j M_{ij} z_j + b_i - \beta\right) - \tanh(-\beta)
 \end{equation}
 
-where $z_i$ is the firing rate of node $i$, $u$ is the gain parameter, $M_{ij}$ is the connection kernel, $b_i$ is the external sensory input, and $\beta$ is a bias term. The network is integrated using Euler's method with timestep $dt$.
+where $z_i$ is the firing rate of node $i$, $u$ is the gain parameter, $M_{ij}$ is the connection kernel, $b_i$ is the external sensory input, and $\beta$ is a bias term. The network is integrated using Euler's method with timestep $dt$ [\textit{citation needed}].
 
 The population vector average gives the decoded heading direction. In 3D, the node positions are converted to Cartesian coordinates, and the activation-weighted mean is computed as:
 
@@ -66,7 +69,7 @@ The population vector average gives the decoded heading direction. In 3D, the no
 where $\mathbf{p}_i$ is the Cartesian unit vector for node $i$.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\section{Ideas}
+\section{Generational of a Spherical Node Network}
 
 \subsection{Node Placement: Fibonacci Sphere}
 
@@ -76,7 +79,7 @@ One approach to placing nodes on a sphere is the Fibonacci Sphere, which uses th
     z_i = 1 - \frac{2i}{N-1}, \qquad r_i = \sqrt{1 - z_i^2}, \qquad \theta_i = i \cdot \frac{2\pi}{\varphi^2}
 \end{equation}
 
-where $\varphi = \frac{1+\sqrt{5}}{2}$ is the golden ratio. The main drawback is that nodes are generated asymmetrically, which produces an uneven connection kernel matrix $M$ and may cause heading tracking issues.
+where $\varphi = \frac{1+\sqrt{5}}{2}$ is the golden ratio. The main drawback is that nodes are generated asymmetrically, which produces an uneven connection kernel matrix $M$. While viable, further testing is needed to determine if the asymmetry of nodes causes a bias when the network is given identical targets to bifurcate between.
 
 \subsection{Node Placement: Icosphere}
 
@@ -88,9 +91,12 @@ An icosphere is the only 3D sphere that can achieve near-perfectly equidistant p
 
 This yields node counts of 12, 42, 162, 642, 2562, 10242, and so on. Because the icosphere has antipodal symmetry (for every node at position $\mathbf{p}$ there exists a node at $-\mathbf{p}$), the connection kernel is symmetric and heading tracking is uniform across all directions.
 
+\subsection{Node Placement Comparison}
+Both the Fibonacci Sphere and icosphere produce valid and usable spherical node networks. The icosphere was initially selected for its antipodal symmetry property due to ease of debugging. Further testing is required to determine the advantages and disadvantages of these methods, and whether one is more optimal or consistent given a specific performance metric.  
+
 \subsection{Discretization Bias}
 
-A fundamental limitation of any discrete node placement is that targets will not in general land exactly on a node. The sensory input at node $i$ from a target at angular distance $\alpha_i$ is:
+A fundamental limitation of any discrete node placement is that targets will not in general land exactly on a node [citation needed]. The sensory input at node $i$ from a target at angular distance $\alpha_i$ is:
 
 \begin{equation}
     b_i = e^{\kappa(\cos \alpha_i - 1)} \cdot \gamma
@@ -110,6 +116,10 @@ This function is strictly monotone decreasing in $d$, since $\frac{d}{dd}(\cos d
 
 A target that happens to land closer to a node receives a stronger peak input than one that falls between nodes. With winner-take-all dynamics above the critical gain $u_{\text{crit}}$, even small differences in peak input are amplified by the nonlinear dynamics, causing the closer target to be selected more often than 50\% of the time. The only clean solution is to increase resolution (larger $n$), which shrinks the maximum node-to-target gap.
 
+\subsection{Further Generation Ideas}
+One could represent the spherical node network using a spherical Fourier series. A spherical FFT converts the network state between the spatial representation, activity per node, and the spectral representation, coefficients of a spherical harmonic expansion. One would then manipulate the Fourier coefficients to achieve the node activations that result from network dynamics. This reduces the cost of the coupling step and removes the need for a uniform node distribution, since the representation is continuous rather than sampled. This idea significantly deviates from the original research basis of a network of neurons, however, it is worth mentioning for future research exploration potential.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Methods}
 
@@ -123,7 +133,7 @@ Nodes are stored internally in polar coordinates as $(r, \phi, \theta)$ where $\
 
 \subsection{Geodesic Distance}
 
-The angular distance between two points on a unit sphere is computed using the spherical law of cosines:
+The angular distance between two points on a unit sphere is computed using the spherical law of cosines \cite{bressloff2019stochastic}:
 
 \begin{equation}
     \alpha = \arccos\left(\cos\theta_i \cos\theta_j + \sin\theta_i \sin\theta_j \cos(\phi_i - \phi_j)\right)
@@ -136,20 +146,21 @@ The argument is clipped to $[-1, 1]$ to avoid numerical errors from floating poi
 The connection weight between nodes $i$ and $j$ is:
 
 \begin{equation}
-    M_{ij} = J \cdot \cos\!\left(\pi \left(\frac{\alpha_{ij}}{\pi}\right)^v\right) \cdot \frac{1}{N}
+    M_{ij} = \cos\!\left(\pi \left(\frac{\alpha_{ij}}{\pi}\right)^v\right) \cdot \frac{1}{N}
 \end{equation}
 
-where $\alpha_{ij}$ is the geodesic distance between nodes $i$ and $j$,e $J$ is the kernel amplitude scalar, $v$ controls the kernel shape (sharpness of the Von-Mises distribution profile), and $N$ is the total number of nodes. The $1/N$ normalization ensures that the maximum eigenvalue of $M$ remains approximately constant as $N$ increases, keeping $u_{\text{crit}}$ stable across resolutions. Note that the $J$ was added to this equation for fine-tuning the kernel, as some variance is observed when increasing the resolution of the icosphere.
+where $\alpha_{ij}$ is the geodesic distance between nodes $i$ and $j$,e $J$ is the kernel amplitude scalar, $v$ controls the kernel shape (sharpness of the Von-Mises distribution profile), and $N$ is the total number of nodes. The $1/N$ normalization ensures that the maximum eigenvalue of $M$ remains approximately constant as $N$ increases, keeping $u_{\text{crit}}$ stable across resolutions. 
 
-\subsection{Critical Gain}
-
-In a 2D RAN, the network moves from a homogeneous state to a bump state at the estimated critical gain:
+This equation was not modified from the current literature of 2D ring attractor networks that use mean-field dynamics [cite Sindiso]. However, in the implementation, a scalar factor of $J$ was added to this equation for fine-tuning the amplitude of kernel. The inspiration came from the \textit{Stochastic neural field theory of wandering bumps on a sphere} paper by Paul C. Bresseloff, which provided helpful equations for an attractor network on a sphere. They use a cosine shaped curve with the following formula \cite{bressloff2019stochastic}: 
 
 \begin{equation}
-    u_{\text{crit}} = \frac{1}{\lambda_{\max}(M) \cdot \text{sech}^2(\beta)}
+        J(\theta, \phi \mid \theta', \phi') = J_0 + J \left[ \cos\theta \cos\theta' + \sin\theta \sin\theta' \cos(\phi - \phi') \right]
 \end{equation}
 
-where $\lambda_{\max}(M)$ is the largest absolute eigenvalue of $M$. This equation no longer remains true in 3D, as empirical tuning of the critical gain did not align with the result of the formula. Currently, empirical tuning via parameter sweeps is the only way to accurately determine this value. Further research is necessary to determine why this equation does not hold in 3D.
+The resulting decision was to stay with the Von-Mises distribution shape to adhere to the current literature [cite Sindiso].
+
+\subsection{Critical Gain}
+ The critical gain $u_{\text{crit}}$ is the value of the coupling parameter where a spontaneous bump emerges. Below this value, the state is stable, so noise decays and nothing forms. Above it, the dominant mode has a positive growth rate, so any perturbation gets amplified into a bump. Currently, empirical tuning via parameter sweeps is the only way to accurately determine this value. One must generate the SAN in the presence of zero targets for different $u$ values until the normalized activation values become non-zero. Further research is necessary to determine if there is a reliable mathematical method to calculate this value based on given network parameters.
 
 \subsection{Sensory Input}
 
@@ -159,7 +170,7 @@ The external input vector $\mathbf{b}$ is generated from a list of targets. Each
     b_i = \frac{1}{\sqrt{N}} \sum_j \gamma_j \, e^{\kappa(\cos \alpha_{ij} - 1)}
 \end{equation}
 
-where $\alpha_{ij}$ is the geodesic distance from node $i$ to target $j$.
+where $\alpha_{ij}$ is the geodesic distance from node $i$ to target $j$.  
 
 \subsection{Integration}
 
@@ -169,7 +180,7 @@ The network is integrated with Euler's method including additive Gaussian noise:
     z(t + dt) = z(t) + dt \left(-z + \tanh(u M z + b - \beta) - \tanh(-\beta)\right) + \eta
 \end{equation}
 
-where $\eta \sim \mathcal{N}(0, \sigma\sqrt{dt}/\sqrt{N})$ per node. Noise is required for symmetry breaking when two targets are of equal quality and equidistant.
+where $\eta \sim \mathcal{N}(0, \sigma\sqrt{dt}/\sqrt{N})$ per node. Noise is required for symmetry breaking when two targets are of equal quality and equidistant. Note that the dynamics remain identical to the original ring attractor network, only the shape of the network changed when transitioning to a 3D network.
 
 \subsection{Computational Cost}
 
@@ -194,97 +205,90 @@ For a laptop at 50 GFLOPS:
 
 $$N \leq \sqrt{\frac{0.02 \times 50 \times 10^9}{2}} = \sqrt{5 \times 10^8} \approx 22{,}000$$
 
-Then, use the icosphere subdivision level provides $N$ below that limit.
+Then, use the icosphere subdivision level provides $N$ below that limit. Note that this does not take into account the processing power required to run additional software components such as a simulator.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Results}
 \subsection{Parameters}
-The following parameters were used to generate the results below: 
+The following parameters were used to generate the results below unless otherwise stated: 
 
 \begin{verbatim}
-    Nsub = 2
-    N_s   = 10 * 4**Nsub +2
-    J = 5
-    beta = 1.0
-    v = 0.5 
+    nsub  = 3                  # N_s = 642 nodes
+    N_s   = 10 * 4**nsub +2
+    beta = 1.5
+    v = 0.5
     dt = 0.1
     sigma = 1.5
-    kappa = 20.0
-    u = 3.0
-    target1 = (1.0, 0, np.pi/2, 10.0)   #distance, phi, theta, quality
-    target2 = (1.0, -np.pi, np.pi/2, 10.0) 
+    kappa = 5.0    
+    u = 32.0
 \end{verbatim}
 
 \subsection{Kernel Generation}
-Using the code in Section \ref{AppendixA}, the kernel was generated and plotted. Figure \ref{fig:kernelShape} shows the shape of the kernel by overlaying the connection strengths of nodes based on geodesic distance. Figure \ref{fig:kernel3} shows a plot of the connection strengths of nodes on the azimuth angle plane, the polar angle plane, and a plot of the connection strength via $\theta$ versus $\phi$ 
+Using the code in Section \ref{AppendixA}, the kernel was generated and plotted for an icosphere with $N = 642$ nodes. Figure \ref{fig:kernelShape} shows the shape of the kernel by overlaying the connection strengths between every pair of nodes as a function of geodesic distance. The connection strength decreases monotonically from a maximum of $1/N \approx 0.0016$ at $\alpha = 0$ to a minimum of $-1/N \approx -0.0016$ at $\alpha = \pi$, so nearby nodes excite each other and distant nodes inhibit each other. Since no additional amplitude scaling was applied, the kernel bounds are set entirely by the $1/N$ normalization. The kernel crosses zero where $(\alpha/\pi)^v = 1/2$, i.e. at $\alpha_0 = \pi \cdot 2^{-1/v}$, which is $\alpha_0 = \pi/4$ for $v = 0.5$.
+
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.5\linewidth]{RAN/RAN_Progress/Media/Kernel/kernelShape.png}
-    \caption{Plot of Connection Strength of Kernel $M$ vs. Geodesic Distance Between Points. The Kernel is shaped as described by the Von-Mises Distribution Equation.}
+    \includegraphics[width=0.5\linewidth]{RAN/RAN_Progress/newer_photos/M_Shape.png}
+    \caption{Plot of connection strength of kernel $M$ vs. geodesic distance between points ($N = 642$, $v = 0.5$). The kernel is shaped as described by the Von-Mises distribution equation and is bounded by $\pm 1/N$.}
     \label{fig:kernelShape}
 \end{figure}
 
+Figure \ref{fig:kernelHeatmap} shows the row of $M$ belonging to a reference node on the equator ($\phi = 0$, $\theta = \pi/2$, marked with a star), plotted over $\theta$ vs. $\phi$ for $v = 0.3$, $0.4$, $0.5$, and $0.6$. The excitatory (red) region around the reference node is circular and isotropic, confirming that the kernel depends only on geodesic distance and not on direction. Increasing $v$ widens the excitatory region, with the zero crossing moving from $\alpha_0 \approx 0.31$ rad at $v = 0.3$ to $\alpha_0 \approx 0.99$ rad at $v = 0.6$, while the inhibitory (blue) region shrinks correspondingly. The peak and trough values remain fixed at $\pm 1/N$ for all $v$. A wider excitatory region produces a wider activity bump, so $v$ directly sets the bump width of the network.
+
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{RAN/RAN_Progress/Media/Kernel/kernelAll3.png}
-    \caption{Plot of kernel matrix $M$, showing the connection strength of nodes on the azimuth angle plane, the polar angle plane, and $\theta$ vs. $\phi$.}
-    \label{fig:kernel3}
+    \includegraphics[width=1\linewidth]{RAN/RAN_Progress/newer_photos/M_HeatmapCombined.png}
+    \caption{Kernel matrix $M$ around a reference node (star) plotted over $\theta$ (colatitude) vs. $\phi$ (azimuth) for $v = 0.3, 0.4, 0.5, 0.6$. Red indicates excitatory connections and blue indicates inhibitory connections.}
+    \label{fig:kernelHeatmap}
 \end{figure}
 
 \subsection{Finding Critical Gain}
-Using the parameters stated earlier, all targets were deactivated and trials were conducted to see what $u$ value produced a spontaneous bump. Figure \ref{fig:u_crit_tuning} shows this manual tuning process.
+Using the parameters stated earlier, all targets were deactivated and a parameter sweep was run over $u = 0$ to $u = 69$ in steps of 1. For each $u$ value, 10 trials of $T = 300$ timesteps were run with $\sigma = 0.5$, and the norm of the final activation vector $\|z\|$ was recorded. Figure \ref{fig:zvu} shows the mean $\|z\|$ for each $u$ value, with error bars showing one standard deviation across trials.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{RAN//RAN_Progress//Media//Param Sweep/Ucrit.png}
-    \caption{Results of Tuning $u$ value to find the critical gain. A spontaneous bump is seen forming around $u_c \approx 2.75$}
-    \label{fig:u_crit_tuning}
-\end{figure}
-
-A better tuning process involves automatically running parameter sweeps and plotting the maximum normalized activation values for each $u$ value. Below, Figure \ref{fig:zvu} shows a plot of the resulting effect on activation strength when changing $u$ values.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\linewidth]{||z||vs.u.png}
-    \caption{Plot of normalized activation values versus $u$ values}
+    \includegraphics[width=0.6\linewidth]{RAN/RAN_Progress/newer_photos/zvsu.png}
+    \caption{Plot of activation norm $\|z\|$ vs. $u$ with zero targets ($N = 642$, 10 trials per $u$). A spontaneous bump forms around $u_c \approx 26$.}
     \label{fig:zvu}
 \end{figure}
 
+Below $u \approx 24$, $\|z\|$ stays at the noise floor of approximately $0.4$, meaning noise decays and no bump forms. Between $u = 25$ and $u = 29$, $\|z\|$ jumps sharply to approximately $14.5$, marking the critical gain at $u_c \approx 26$. The larger error bar at $u = 25$ reflects that, near the transition, only some trials form a bump. Above the transition, $\|z\|$ continues to grow slowly and saturates near $19$ as the $\tanh$ nonlinearity limits the activation of each node. The operating value of $u = 32$ was chosen to sit just above this transition, so that the network reliably forms a bump without being driven deep into saturation.
+
 \subsection{Single Target Tracking}
 
-With a single target, the network correctly forms a single activity bump centered on the target location. The population vector average accurately recovers the target direction. Figure \ref{fig:one_targ_plot} shows a plot of sensory input from the target and a plot of the resulting RAN dynamics where a stable bump forms over the direction of the target. Figure \ref{fig:one_targ_sphere_plot} shows an intuitive spherical plot of the same data, with darker regions representing stronger activation strengths and a direction vector representing the target heading.
+With a single target, the network correctly forms a single activity bump centered on the target location. The population vector average accurately recovers the target direction. Figure \ref{fig:one_targ_plot} shows a surface plot of the sensory input from the target (left) and a surface plot of the resulting RAN activation (right) over $\phi$ and $\theta$. The recurrent dynamics amplify the input into a stable, saturated bump directly over the target, with a peak activation considerably larger than the peak input.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\linewidth]{RAN//RAN_Progress//Media//Param Sweep/z_one_target.png}
-    \caption{Plot of Sensory Input and Activation Strength of RAN from One Target}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/1_targ_input.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/1_targ_bump.png}
+    \end{minipage}
+    \caption{Surface plots of sensory input (left) and resulting RAN activation strength (right) for one target. A stable bump forms over the target.}
     \label{fig:one_targ_plot}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\linewidth]{RAN//RAN_Progress//Media//Param Sweep/one_targ_sphere_plot.png}
-    \caption{Spherical plot of sensory input of one target and plot of resulting activation strength from RAN Dynamics. The darker regions represent areas of stronger activation and the red vector points towards the RAN target heading.}
-    \label{fig:one_targ_sphere_plot}
 \end{figure}
 
 \subsection{Two Target Selection with Equal Qualities}
 
-With two targets that have equal qualities, the network exhibits winner-take-all behavior above $u_{\text{crit}}$. When targets are placed 180 degrees apart (antipodal), selection is 50/50 due to noise-driven symmetry breaking. For non-antipodal targets, discretization bias causes the target closer to a node to be selected more frequently. For the following figures, targets were placed at the same $\theta$, with one at $\phi = 0$ and the other at $\phi = \pi$. Both these angle combinations align perfectly with an icosphere node, thus, no discretization bias is present. Figure \ref{fig:two_targ_plot} shows a plot of sensory input from two targets and a plot of the resulting RAN dynamics where a stable bump forms over the direction of one of the randomly-selected targets. Figure \ref{fig:two_targ_sphere} shows an intuitive spherical plot of the same data, with darker regions representing stronger activation strengths, and a direction vector representing the target heading.
+With two targets that have equal qualities, the network exhibits winner-take-all behavior above $u_{\text{crit}}$. When targets are placed 180 degrees apart (antipodal), selection is 50/50 due to noise-driven symmetry breaking. For non-antipodal targets, discretization bias causes the target closer to a node to be selected more frequently. For the following figures, both targets were given quality $\gamma = 20$ and placed at $\theta = \pi/2$, with one at $\phi = 0$ and the other at $\phi = \pi$. Both these angle combinations align perfectly with an icosphere node, thus, no discretization bias is present. Figure \ref{fig:two_targ_plot} shows a surface plot of the sensory input from both targets (left) and the resulting RAN activation (right). Note that the target at $\phi = \pi$ appears split across the left and right edges of the input plot because $\phi = -\pi$ and $\phi = \pi$ are the same direction. The network suppresses the input from one target entirely and forms a single stable bump over the other, randomly-selected target.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{RAN//RAN_Progress//Media//Param Sweep/two_targ_plot.png}
-    \caption{Plot of two target sensory input and resulting activation strength from RAN dynamics. A stable bump forms over one of the two randomly-selected targets}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/two_targ_input.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/two_targ_bump.png}
+    \end{minipage}
+    \caption{Surface plots of sensory input (left) and resulting RAN activation strength (right) for two antipodal targets of equal quality. A stable bump forms over one of the two randomly-selected targets.}
     \label{fig:two_targ_plot}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.75\linewidth]{RAN//RAN_Progress//Media//Param Sweep/two_targ_sphere_plot.png}
-    \caption{Spherical plot of sensory input of two targets and plot of resulting activation strength from RAN Dynamics. The darker regions represent areas of stronger activation and the red vector points towards the RAN target heading}
-    \label{fig:two_targ_sphere}
 \end{figure}
 
 In order for a target to be selected, enough time must pass for both global inhibition and inhibition from other nodes for a stable bump to form over one input. Using previously mentioned parameters, 200 timesteps were used for the bump to converge to a target. Below, Figure \ref{fig:2converge} shows a plot of phase error or error in desired angular distance to real angular distance versus each timestep of RAN generation. Note that the timestep axis begins around 40 due to non-meaningful noise produced in initial RAN generation.
@@ -296,19 +300,25 @@ In order for a target to be selected, enough time must pass for both global inhi
     \label{fig:2converge}
 \end{figure}
 
-\subsection{Phase Error vs. Target Quality}
+\subsection{Three Target Selection with Equal Qualities}
 
-The quality parameter $\gamma$ scales the magnitude of the sensory input that each target injects into the network, as defined in the sensory input equation $b_i = \frac{1}{\sqrt{N}} \sum_j \gamma_j \, e^{\kappa(\cos \alpha_{ij} - 1)}$. To characterize how strong a target must be before the network reliably forms a bump and locks onto a heading, the quality of both targets was swept together from $\gamma = 0$ to $\gamma = 98$ and the steady-state phase error was measured. For each value of $\gamma$, $n = 20$ trials were run with $u = 6.0$ and the remaining parameters held fixed. The phase error was averaged over the final third of each $T = 400$ step run, and for every trial the smaller of the two target errors was taken, that is, the target the network ultimately settled on.
+To test selection between more than two options, three targets of equal quality ($\gamma = 20$) were placed symmetrically around one of the icosphere's 3-fold symmetry axes, each $39^\circ$ from the axis and separated by $120^\circ$ rotations about it. Because the icosphere is unchanged by a $120^\circ$ rotation about this axis, the three targets see identical local node neighborhoods, so no discretization bias favors any one target and only noise decides the winner. For this run, $u = 32$, $\sigma = 1.0$, and $\kappa = 10$ were used.
 
-Figure \ref{fig:phase_err_quality} shows the result. At low quality the sensory input is too weak to seed a stable bump, so the decoded heading is driven mainly by noise and the phase error is large (around $0.9$ rad) with high trial-to-trial variance. As $\gamma$ increases, the input crosses the threshold needed to nucleate and hold a bump, and the phase error collapses toward zero with the variance shrinking accordingly. Beyond $\gamma \approx 25$ the network converges essentially perfectly onto one of the targets on every trial. This confirms that target quality acts as a soft threshold on bump formation: below it the network cannot commit to a heading, and above it tracking accuracy saturates.
+Figure \ref{fig:three_targ_plot} shows the sensory input (left) and resulting RAN activation (right). Unlike the antipodal two target case, the three targets are close enough together that their input bumps overlap. The network still forms a single bump rather than three, showing that the winner-take-all behavior extends to more than two targets. However, the peak activation (approximately $1.1$) is noticeably lower than in the one and two target cases (approximately $1.8$ to $1.9$), and the bump is less sharply defined. This suggests that the competition between nearby targets is harder to resolve, and further trials are needed to confirm that the bump settles on a single target rather than an average of neighboring targets.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{RAN/RAN_Progress/Media/phase_error_vs_quality.png}
-    \caption{Steady-state phase error vs. target quality $\gamma$ for two antipodal targets ($u = 6.0$, averaged over the last third of $T = 400$, $n = 20$ trials). Error bars show one standard deviation across trials. Below $\gamma \approx 25$ the bump fails to lock and the error is noise-dominated; above it the network converges reliably.}
-    \label{fig:phase_err_quality}
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/3_targ_sensory.png}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{RAN/RAN_Progress/newer_photos/3_targ_bump.png}
+    \end{minipage}
+    \caption{Surface plots of sensory input (left) and resulting RAN activation strength (right) for three symmetrically placed targets of equal quality. A single bump forms.}
+    \label{fig:three_targ_plot}
 \end{figure}
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \section{Conclusions}
@@ -318,9 +328,9 @@ The following lessons were learned during development of the 3D spherical RAN:
 \begin{enumerate}
     \item An icosphere with subdivision level $n$ provides near-perfectly equidistant nodes and antipodal symmetry, making it the correct choice for uniform spherical representation.
 
-    \item The connection kernel must be normalized by $1/N$ so that $u_{\text{crit}}$ remains consistent across different resolutions. Scaling is also necessary to produce a reliable 3D RAN model. Maximum and minimum connection strength values of 0.03 and -0.03 respectively produced the desired behavior with the parameters that were used.
+    \item The connection kernel must be normalized by $1/N$ so that $u_{\text{crit}}$ remains consistent across different resolutions. With the $1/N$ normalization alone, the connection strengths are bounded by $\pm 1/N$ (approximately $\pm 0.0016$ for $N = 642$), which produced the desired behavior with $u = 32$ and the parameters that were used.
 
-    \item Winner-take-all behaviour requires $u > u_{\text{crit}}$ and sufficient noise $\sigma$ for symmetry breaking. At $n=2$ ($N=162$), $\sigma = 1.5$ was found to work reliably when targets were antipodal their directions were aligned with a node.
+    \item Winner-take-all behaviour requires $u > u_{\text{crit}}$ and sufficient noise $\sigma$ for symmetry breaking. At $n=3$ ($N=642$), $\sigma = 1.5$ was found to work reliably when targets were antipodal and their directions were aligned with a node.
 
     \item Discretization bias is an inherent limitation: a target landing closer to a node receives a stronger peak sensory input $b_{\text{peak}} = e^{\kappa(\cos d - 1)}$, which is monotone decreasing in the node-to-target gap $d$. This bias is amplified by winner-take-all dynamics and can only be reduced by increasing resolution.
     \begin{itemize}
@@ -376,5 +386,7 @@ Euler Integration for Ring Dynamics:
 *Note that $\mathbf{y}$ stores the entire generation history of the RAN, which is useful for debugging the static generation of the ring attractor. For a continuous or dynamic ring attractor, this term can be omitted and simply the current $\mathbf{z}$ can be used.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% --- Bibliography Output ---
+\printbibliography 
 
 \end{document}
